@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	driver "github.com/arangodb/go-driver"
 	"github.com/arangodb/go-driver/http"
@@ -11,7 +12,7 @@ import (
 
 var ctx = context.Background()
 
-var PASSWORD = "root"
+var ARANGO_ROOT_PASSWORD = os.Getenv("ARANGO_ROOT_PASSWORD")
 
 func main() {
 	conn, err := http.NewConnection(http.ConnectionConfig{
