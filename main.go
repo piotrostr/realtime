@@ -12,22 +12,31 @@ import (
 
 var ctx = context.Background()
 
-var ARANGO_ROOT_PASSWORD = os.Getenv("ARANGO_ROOT_PASSWORD")
+var (
+	ARANGO_ROOT_PASSWORD = os.Getenv("ARANGO_ROOT_PASSWORD")
+	DB_HOST              = os.Getenv("DB_HOST")
+	DB_PORT              = os.Getenv("DB_PORT")
+)
 
 func main() {
+	dbUrl := fmt.Sprintf("http://%s:%s", DB_HOST, DB_PORT)
+	fmt.Println(dbUrl)
+
 	conn, err := http.NewConnection(http.ConnectionConfig{
-		Endpoints: []string{"http://localhost:8529"},
+		Endpoints: []string{dbUrl},
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	client, err := driver.NewClient(driver.ClientConfig{
 		Connection:     conn,
-		Authentication: driver.BasicAuthentication("root", "root"),
+		Authentication: driver.BasicAuthentication("root", ARANGO_ROOT_PASSWORD),
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	exists, err := client.DatabaseExists(ctx, "realtime")
 	if err != nil {
 		log.Fatal(err)
@@ -39,6 +48,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+
 	db, err := client.Database(ctx, "realtime")
 	if err != nil {
 		log.Fatal(err)
@@ -54,5 +64,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fmt.Println(meta)
 }
