@@ -14,11 +14,11 @@ func TestE2E(t *testing.T) {
 	db.ReadOne("Piotr")
 	db.Update(User{Name: "Piotr", Age: 22})
 	db.ReadOne("Piotr")
-	db.Delete("Piotr")
+	db.Delete(User{Name: "Piotr"})
 
 	// clean up, skip in prod
-	err := db.DeleteDB()
-	if err != nil {
-		t.Error(err)
-	}
+	// err := db.DeleteDB()
+	// if err != nil {
+	// 	t.Error(err)
+	// }
 }

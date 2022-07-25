@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
 	database "github.com/piotrostr/realtime/db"
@@ -63,11 +65,18 @@ func GetRouter() *gin.Engine {
 	router.DELETE("/delete", func(c *gin.Context) {
 		var user database.User
 		err := c.BindJSON(&user)
+		fmt.Printf("%+v\n", user)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
-		meta := db.Delete(user.Name)
+
+		meta := db.Delete(user)
+		if meta == nil {
+			c.JSON(404, gin.H{"error": "user not found"})
+			return
+		}
+
 		c.JSON(204, meta)
 	})
 

@@ -41,6 +41,16 @@ func TestCreate(t *testing.T) {
 	assert.Equal(t, 201, w.Code)
 }
 
+func TestReadOne(t *testing.T) {
+	router := rest.GetRouter()
+	w := httptest.NewRecorder()
+
+	req, err := http.NewRequest("GET", "/read/Piotr", nil)
+	assert.Nil(t, err)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, 200, w.Code)
+}
+
 func TestRead(t *testing.T) {
 	router := rest.GetRouter()
 	w := httptest.NewRecorder()
@@ -66,9 +76,18 @@ func TestDelete(t *testing.T) {
 	router := rest.GetRouter()
 	w := httptest.NewRecorder()
 
-	req, err := http.NewRequest("DELETE", "/delete", nil)
+	// create user for delete to work
+	user := UserJsonFixture(t)
+	createReq, err := http.NewRequest("POST", "/create", user)
 	assert.Nil(t, err)
-	router.ServeHTTP(w, req)
+	router.ServeHTTP(w, createReq)
+	assert.Equal(t, 201, w.Code)
+
+	w = httptest.NewRecorder()
+	user = UserJsonFixture(t)
+	deleteReq, err := http.NewRequest("DELETE", "/delete", user)
+	assert.Nil(t, err)
+	router.ServeHTTP(w, deleteReq)
 
 	assert.Equal(t, 204, w.Code)
 }
