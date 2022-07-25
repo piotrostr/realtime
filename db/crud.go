@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"fmt"
 
 	driver "github.com/arangodb/go-driver"
@@ -8,32 +9,33 @@ import (
 
 func (db *DB) CheckIfExists(user User) (bool, *driver.DocumentMeta) {
 	// check if record exists
+	all := db.ReadAll()
+	db.logger.Infof("this is here: %d %+v", len(all), all)
+
 	query := fmt.Sprintf(
-		`FOR u IN %s FILTER u.name == "%s" RETURN u`,
+		`FOR doc IN %s FILTER doc.name == 'Piotr' RETURN doc`,
 		db.col.Name(),
-		user.Name,
+		// user.Name,
 	)
 
-	cursor, err := db.col.Database().Query(
-		ctx,
-		query,
-		nil,
-	)
+	err := db.database.ValidateQuery(ctx, query)
 	if err != nil {
 		db.logger.Fatalf(err.Error())
 	}
 
-	defer cursor.Close()
-	exists := cursor.Count() > 0
-
-	if exists {
-		meta, err := cursor.ReadDocument(ctx, new(interface{}))
-		if err != nil {
-			db.logger.Fatalf(err.Error())
-		}
-		return exists, &meta
+	cursor, err := db.database.Query(ctx, query, nil)
+	if err != nil {
+		db.logger.Fatalf(err.Error())
 	}
-	return exists, nil
+	defer cursor.Close()
+
+	meta, err := cursor.ReadDocument(ctx, &user)
+	if errors.Is(err, driver.NoMoreDocumentsError{}) {
+		return false, nil
+	} else if err != nil {
+		db.logger.Fatalf(err.Error())
+	}
+	return true, &meta
 }
 
 // create a record
@@ -81,7 +83,6 @@ func (db *DB) ReadAll() []*User {
 // read one record by name
 func (db *DB) ReadOne(name string) (*User, *driver.DocumentMeta, error) {
 	exists, meta := db.CheckIfExists(User{Name: name})
-	db.logger.Infof("ReadOne exists: %t, meta: %+v\n", exists, meta)
 	if !exists {
 		return nil, nil, fmt.Errorf("user does not exist")
 	}
@@ -115,8 +116,7 @@ func (db *DB) Update(user User) *driver.DocumentMeta {
 // delete record
 func (db *DB) Delete(user User) *driver.DocumentMeta {
 	// check if record exists
-	exists, meta := db.CheckIfExists(User{Name: "Piotr"})
-	fmt.Printf("exists: %t, meta: %+v\n", exists, meta)
+	exists, meta := db.CheckIfExists(User{Name: "Piotr", Age: 30})
 	if !exists {
 		db.logger.Errorf(
 			"user with name %s does not exist in %s %s",

@@ -48,12 +48,12 @@ func (db *DB) Init() {
 		db.logger.Fatalf(err.Error())
 	}
 
-	err = db.InitializeDatabase()
+	err = db.InitializeDatabase(DB_NAME)
 	if err != nil {
 		db.logger.Fatalf(err.Error())
 	}
 
-	err = db.InitializeCollection()
+	err = db.InitializeCollection(DB_COLLECTION)
 	if err != nil {
 		db.logger.Fatalf(err.Error())
 	}
@@ -89,20 +89,20 @@ func (db *DB) Authenticate() error {
 }
 
 // creates a database if non-existant, initializes the driver.Database
-func (db *DB) InitializeDatabase() error {
-	exists, err := db.client.DatabaseExists(ctx, DB_NAME)
+func (db *DB) InitializeDatabase(dbName string) error {
+	exists, err := db.client.DatabaseExists(ctx, dbName)
 	if err != nil {
 		return err
 	}
 
 	if !exists {
-		_, err = db.client.CreateDatabase(ctx, DB_NAME, nil)
+		_, err = db.client.CreateDatabase(ctx, dbName, nil)
 		if err != nil {
 			return err
 		}
 	}
 
-	database, err := db.client.Database(ctx, DB_NAME)
+	database, err := db.client.Database(ctx, dbName)
 	if err != nil {
 		return err
 	}
@@ -112,20 +112,20 @@ func (db *DB) InitializeDatabase() error {
 }
 
 // creates a collection if non-existant, initializes the driver.Collection
-func (db *DB) InitializeCollection() error {
-	exists, err := db.database.CollectionExists(ctx, DB_COLLECTION)
+func (db *DB) InitializeCollection(collectionName string) error {
+	exists, err := db.database.CollectionExists(ctx, collectionName)
 	if err != nil {
 		return err
 	}
 
 	if !exists {
-		_, err = db.database.CreateCollection(ctx, DB_COLLECTION, nil)
+		_, err = db.database.CreateCollection(ctx, collectionName, nil)
 		if err != nil {
 			return err
 		}
 	}
 
-	col, err := db.database.Collection(ctx, DB_COLLECTION)
+	col, err := db.database.Collection(ctx, collectionName)
 	if err != nil {
 		db.logger.Fatalf(err.Error())
 	}
