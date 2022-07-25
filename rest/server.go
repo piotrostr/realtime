@@ -11,6 +11,7 @@ func GetRouter() *gin.Engine {
 	router := gin.Default()
 	db := database.DB{}
 
+	// returns User obj
 	router.POST("/create", func(c *gin.Context) {
 		var user database.User
 		err := c.BindJSON(&user)
@@ -18,20 +19,51 @@ func GetRouter() *gin.Engine {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
-		db.Create(user)
-		c.JSON(200, gin.H{"message": "success"})
+		createdUser := db.Create(user)
+		c.JSON(200, createdUser)
 	})
 
+	// returns []User obj
 	router.GET("/read", func(c *gin.Context) {
+		users := db.ReadAll()
+		c.JSON(200, users)
+	})
+
+	// returns metadata associated with the update
+	router.PUT("/update", func(c *gin.Context) {
 		var user database.User
-		db.ReadOne()
+		err := c.BindJSON(&user)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		meta := db.Update(user)
+		c.JSON(200, meta)
+	})
+
+	// returns User obj
+	router.GET("/read/:name", func(c *gin.Context) {
+		name := c.Param("name")
+		var user database.User
+		userByName := db.ReadOne(name)
+		if userByName == nil {
+			c.JSON(404, gin.H{"error": "user not found"})
+			return
+		}
 		c.JSON(200, user)
 	})
 
-	router.PUT("/update", func(c *gin.Context) {
+	// returns metadata associated with the delete
+	router.DELETE("/delete", func(c *gin.Context) {
+		var user database.User
+		err := c.BindJSON(&user)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		meta := db.Delete(user.Name)
+		c.JSON(200, meta)
 	})
-
-	router.DELETE("/delete", func(c *gin.Context) {})
 
 	return router
 }

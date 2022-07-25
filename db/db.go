@@ -13,6 +13,7 @@ import (
 
 var ctx = context.Background()
 
+// required env vars for establishing the conn
 var (
 	ARANGO_ROOT_PASSWORD = os.Getenv("ARANGO_ROOT_PASSWORD")
 	DB_PROTOCOL          = os.Getenv("DB_PROTOCOL")
@@ -22,6 +23,7 @@ var (
 	DB_COLLECTION        = os.Getenv("DB_COLLECTION")
 )
 
+// main struct for the database
 type DB struct {
 	client   driver.Client
 	conn     driver.Connection
@@ -50,6 +52,8 @@ func (db *DB) Authenticate() {
 		Connection:     db.conn,
 		Authentication: auth,
 	})
+	// TODO return all of the errors and handle in the router to prevent
+	// 50X errors
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,12 +102,14 @@ func (db *DB) InitializeCollection() {
 	db.col = col
 }
 
+// update the meta on the database struct
 func (db *DB) UpdateMeta(meta driver.DocumentMeta) {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 	db.meta = meta
 }
 
+// create a record
 func (db *DB) Create(user User) *User {
 	// check if record exists
 	query := fmt.Sprintf(
@@ -136,7 +142,7 @@ func (db *DB) Create(user User) *User {
 	return db.ReadOne(user.Name)
 }
 
-// read record
+// read all records
 func (db *DB) ReadAll() []*User {
 	cursor, err := db.col.Database().Query(
 		ctx,
@@ -160,6 +166,7 @@ func (db *DB) ReadAll() []*User {
 	return users
 }
 
+// read one record by name
 func (db *DB) ReadOne(name string) *User {
 	q := fmt.Sprintf(`FOR u IN col FILTER u.name == '%s' RETURN u`, name)
 	cursor, err := db.col.Database().Query(ctx, q, nil)
@@ -177,9 +184,8 @@ func (db *DB) ReadOne(name string) *User {
 }
 
 // update record
-func (db *DB) Update() driver.DocumentMeta {
-	patch := map[string]int{"Age": 21}
-	meta, err := db.col.UpdateDocument(ctx, db.meta.Key, patch)
+func (db *DB) Update(user User) driver.DocumentMeta {
+	meta, err := db.col.UpdateDocument(ctx, user.Name, user)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -189,7 +195,7 @@ func (db *DB) Update() driver.DocumentMeta {
 }
 
 // delete record
-func (db *DB) Delete() driver.DocumentMeta {
+func (db *DB) Delete(name string) driver.DocumentMeta {
 	meta, err := db.col.RemoveDocument(ctx, db.meta.Key)
 	if err != nil {
 		log.Fatal(err)
@@ -199,6 +205,7 @@ func (db *DB) Delete() driver.DocumentMeta {
 	return meta
 }
 
+// delete the whole db
 func (db *DB) DeleteDB() {
 	err := db.database.Remove(ctx)
 	if err != nil {
