@@ -48,17 +48,13 @@ func GetRouter() *gin.Engine {
 	// returns User obj
 	router.GET("/read/:name", func(c *gin.Context) {
 		name := c.Param("name")
-		var user database.User
 		userByName, _, err := db.ReadOne(name)
+		fmt.Println(err)
 		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			c.JSON(404, gin.H{"error": err.Error()})
 			return
 		}
-		if userByName == nil {
-			c.JSON(404, gin.H{"error": "user not found"})
-			return
-		}
-		c.JSON(200, user)
+		c.JSON(200, userByName)
 	})
 
 	// returns metadata associated with the delete
