@@ -33,7 +33,7 @@ type DB struct {
 	mutex    sync.Mutex
 }
 
-func (db *DB) Connect() {
+func (db *DB) Connect() error {
 	dbUrl := fmt.Sprintf("%s://%s:%s", DB_PROTOCOL, DB_HOST, DB_PORT)
 	fmt.Printf("URL: %s\n", dbUrl)
 
@@ -41,12 +41,13 @@ func (db *DB) Connect() {
 		Endpoints: []string{dbUrl},
 	})
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	db.conn = conn
+	return nil
 }
 
-func (db *DB) Authenticate() {
+func (db *DB) Authenticate() error {
 	auth := driver.BasicAuthentication("root", ARANGO_ROOT_PASSWORD)
 	client, err := driver.NewClient(driver.ClientConfig{
 		Connection:     db.conn,
@@ -55,43 +56,45 @@ func (db *DB) Authenticate() {
 	// TODO return all of the errors and handle in the router to prevent
 	// 50X errors
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	db.client = client
+	return nil
 }
 
 // creates a database if non-existant, initializes the driver.Database
-func (db *DB) InitializeDatabase() {
+func (db *DB) InitializeDatabase() error {
 	exists, err := db.client.DatabaseExists(ctx, DB_NAME)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if !exists {
 		_, err = db.client.CreateDatabase(ctx, DB_NAME, nil)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 
 	database, err := db.client.Database(ctx, DB_NAME)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	db.database = database
+	return nil
 }
 
 // creates a collection if non-existant, initializes the driver.Collection
-func (db *DB) InitializeCollection() {
+func (db *DB) InitializeCollection() error {
 	exists, err := db.database.CollectionExists(ctx, DB_COLLECTION)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if !exists {
 		_, err = db.database.CreateCollection(ctx, DB_COLLECTION, nil)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 
@@ -100,6 +103,7 @@ func (db *DB) InitializeCollection() {
 		log.Fatal(err)
 	}
 	db.col = col
+	return nil
 }
 
 // update the meta on the database struct
@@ -216,9 +220,10 @@ func (db *DB) Delete(name string) *driver.DocumentMeta {
 }
 
 // delete the whole db
-func (db *DB) DeleteDB() {
+func (db *DB) DeleteDB() error {
 	err := db.database.Remove(ctx)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
