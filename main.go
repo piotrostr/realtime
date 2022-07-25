@@ -12,10 +12,10 @@ func main() {
 	db.InitializeDatabase()
 	db.InitializeCollection()
 	db.Create(database.User{Name: "Piotr", Age: 30})
-	db.ReadOne()
-	db.Update()
-	db.ReadOne()
-	db.Delete()
+	db.ReadOne("Piotr")
+	db.Update(database.User{Name: "Piotr", Age: 22})
+	db.ReadOne("Piotr")
+	db.Delete("Piotr")
 
 	// clean up, skip in prod
 	db.DeleteDB()

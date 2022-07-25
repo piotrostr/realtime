@@ -20,7 +20,7 @@ func GetRouter() *gin.Engine {
 			return
 		}
 		createdUser := db.Create(user)
-		c.JSON(200, createdUser)
+		c.JSON(201, createdUser)
 	})
 
 	// returns []User obj
@@ -38,14 +38,18 @@ func GetRouter() *gin.Engine {
 			return
 		}
 		meta := db.Update(user)
-		c.JSON(200, meta)
+		c.JSON(204, meta)
 	})
 
 	// returns User obj
 	router.GET("/read/:name", func(c *gin.Context) {
 		name := c.Param("name")
 		var user database.User
-		userByName := db.ReadOne(name)
+		userByName, _, err := db.ReadOne(name)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
 		if userByName == nil {
 			c.JSON(404, gin.H{"error": "user not found"})
 			return
@@ -62,7 +66,7 @@ func GetRouter() *gin.Engine {
 			return
 		}
 		meta := db.Delete(user.Name)
-		c.JSON(200, meta)
+		c.JSON(204, meta)
 	})
 
 	return router

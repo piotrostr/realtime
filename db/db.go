@@ -110,7 +110,7 @@ func (db *DB) UpdateMeta(meta driver.DocumentMeta) {
 }
 
 // create a record
-func (db *DB) Create(user User) *User {
+func (db *DB) Create(user User) *driver.DocumentMeta {
 	// check if record exists
 	query := fmt.Sprintf(
 		`FOR u IN col FILTER u.name == '%s' RETURN u`,
@@ -137,9 +137,9 @@ func (db *DB) Create(user User) *User {
 		}
 		fmt.Printf("create res: %+v\n", meta)
 		db.UpdateMeta(meta)
+		return &meta
 	}
-
-	return db.ReadOne(user.Name)
+	return nil
 }
 
 // read all records
@@ -167,41 +167,51 @@ func (db *DB) ReadAll() []*User {
 }
 
 // read one record by name
-func (db *DB) ReadOne(name string) *User {
+func (db *DB) ReadOne(name string) (*User, *driver.DocumentMeta, error) {
 	q := fmt.Sprintf(`FOR u IN col FILTER u.name == '%s' RETURN u`, name)
 	cursor, err := db.col.Database().Query(ctx, q, nil)
 	if err != nil {
-		log.Fatal(err)
+		return nil, nil, err
 	}
 	var user User
 	meta, err := cursor.ReadDocument(ctx, &user)
 	if err != nil {
-		log.Fatal(err)
+		return nil, nil, err
 	}
 	fmt.Printf("read res: %+v\n", user)
 	db.UpdateMeta(meta)
-	return &user
+	return &user, &meta, err
 }
 
 // update record
-func (db *DB) Update(user User) driver.DocumentMeta {
-	meta, err := db.col.UpdateDocument(ctx, user.Name, user)
+func (db *DB) Update(user User) *driver.DocumentMeta {
+	// check if record exists
+	_, meta, err := db.ReadOne(user.Name)
+	if err != nil {
+		return nil
+	}
+	*meta, err = db.col.UpdateDocument(ctx, meta.Key, user)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("update res: %+v\n", meta)
-	db.UpdateMeta(meta)
+	db.UpdateMeta(*meta)
 	return meta
 }
 
 // delete record
-func (db *DB) Delete(name string) driver.DocumentMeta {
-	meta, err := db.col.RemoveDocument(ctx, db.meta.Key)
+func (db *DB) Delete(name string) *driver.DocumentMeta {
+	// check if record exists
+	_, meta, err := db.ReadOne(name)
+	if err != nil {
+		return nil
+	}
+	*meta, err = db.col.RemoveDocument(ctx, meta.Key)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("delete res: %+v\n", meta)
-	db.UpdateMeta(meta)
+	db.UpdateMeta(*meta)
 	return meta
 }
 
