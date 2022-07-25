@@ -8,26 +8,7 @@ import (
 
 func TestE2E(t *testing.T) {
 	db := DB{}
-
-	err := db.Connect()
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = db.Authenticate()
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = db.InitializeDatabase()
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = db.InitializeCollection()
-	if err != nil {
-		t.Error(err)
-	}
+	db.Init()
 
 	db.Create(User{Name: "Piotr", Age: 30})
 	db.ReadOne("Piotr")
@@ -36,7 +17,7 @@ func TestE2E(t *testing.T) {
 	db.Delete("Piotr")
 
 	// clean up, skip in prod
-	err = db.DeleteDB()
+	err := db.DeleteDB()
 	if err != nil {
 		t.Error(err)
 	}

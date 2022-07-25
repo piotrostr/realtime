@@ -3,12 +3,13 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 
 	driver "github.com/arangodb/go-driver"
 	"github.com/arangodb/go-driver/http"
+	"github.com/piotrostr/realtime/logger"
+	"go.uber.org/zap"
 )
 
 var ctx = context.Background()
@@ -31,11 +32,36 @@ type DB struct {
 	col      driver.Collection
 	meta     driver.DocumentMeta // metadata of the last document created
 	mutex    sync.Mutex
+	logger   *zap.SugaredLogger
+}
+
+func (db *DB) Init() {
+	db.logger = logger.Get()
+
+	err := db.Connect()
+	if err != nil {
+		db.logger.Fatalf(err.Error())
+	}
+
+	err = db.Authenticate()
+	if err != nil {
+		db.logger.Fatalf(err.Error())
+	}
+
+	err = db.InitializeDatabase()
+	if err != nil {
+		db.logger.Fatalf(err.Error())
+	}
+
+	err = db.InitializeCollection()
+	if err != nil {
+		db.logger.Fatalf(err.Error())
+	}
 }
 
 func (db *DB) Connect() error {
 	dbUrl := fmt.Sprintf("%s://%s:%s", DB_PROTOCOL, DB_HOST, DB_PORT)
-	fmt.Printf("URL: %s\n", dbUrl)
+	db.logger.Infof("URL: %s\n", dbUrl)
 
 	conn, err := http.NewConnection(http.ConnectionConfig{
 		Endpoints: []string{dbUrl},
@@ -49,15 +75,15 @@ func (db *DB) Connect() error {
 
 func (db *DB) Authenticate() error {
 	auth := driver.BasicAuthentication("root", ARANGO_ROOT_PASSWORD)
+
 	client, err := driver.NewClient(driver.ClientConfig{
 		Connection:     db.conn,
 		Authentication: auth,
 	})
-	// TODO return all of the errors and handle in the router to prevent
-	// 50X errors
 	if err != nil {
 		return err
 	}
+
 	db.client = client
 	return nil
 }
@@ -98,9 +124,9 @@ func (db *DB) InitializeCollection() error {
 		}
 	}
 
-	col, err := db.database.Collection(ctx, "col")
+	col, err := db.database.Collection(ctx, DB_COLLECTION)
 	if err != nil {
-		log.Fatal(err)
+		db.logger.Fatalf(err.Error())
 	}
 	db.col = col
 	return nil
@@ -113,11 +139,11 @@ func (db *DB) UpdateMeta(meta driver.DocumentMeta) {
 	db.meta = meta
 }
 
-// create a record
-func (db *DB) Create(user User) *driver.DocumentMeta {
+func (db *DB) CheckIfExists(user User) bool {
 	// check if record exists
 	query := fmt.Sprintf(
-		`FOR u IN col FILTER u.name == '%s' RETURN u`,
+		`FOR u IN %s FILTER u.name == '%s' RETURN u`,
+		db.col.Name(),
 		user.Name,
 	)
 	cursor, err := db.col.Database().Query(
@@ -126,20 +152,26 @@ func (db *DB) Create(user User) *driver.DocumentMeta {
 		nil,
 	)
 	if err != nil {
-		log.Fatal(err)
+		db.logger.Fatalf(err.Error())
 	}
 	defer cursor.Close()
-
 	exists := cursor.Count() != 0
+	return exists
+}
+
+// create a record
+func (db *DB) Create(user User) *driver.DocumentMeta {
+	// check if exists
+	exists := db.CheckIfExists(user)
 
 	// create record if not exists, read record
 	if !exists {
 		// create record
 		meta, err := db.col.CreateDocument(ctx, user)
 		if err != nil {
-			log.Fatal(err)
+			db.logger.Fatalf(err.Error())
 		}
-		fmt.Printf("create res: %+v\n", meta)
+		db.logger.Infof("create res: %+v\n", meta)
 		db.UpdateMeta(meta)
 		return &meta
 	}
@@ -148,41 +180,51 @@ func (db *DB) Create(user User) *driver.DocumentMeta {
 
 // read all records
 func (db *DB) ReadAll() []*User {
-	cursor, err := db.col.Database().Query(
-		ctx,
-		`FOR u IN col FILTER u.name == 'Piotr' RETURN u`,
-		nil,
-	)
+	q := fmt.Sprintf(`FOR u IN %s RETURN u`, db.col.Name())
+	cursor, err := db.col.Database().Query(ctx, q, nil)
 	if err != nil {
-		log.Fatal(err)
+		db.logger.Fatalf(err.Error())
 	}
+
 	var users []*User
 	for cursor.HasMore() {
 		var user User
 		meta, err := cursor.ReadDocument(ctx, &user)
 		if err != nil {
-			log.Fatal(err)
+			db.logger.Fatalf(err.Error())
 		}
-		fmt.Printf("read res: %+v\n", user)
+		db.logger.Infof("read res: %+v\n", user)
 		users = append(users, &user)
 		db.UpdateMeta(meta)
 	}
+
 	return users
 }
 
 // read one record by name
 func (db *DB) ReadOne(name string) (*User, *driver.DocumentMeta, error) {
-	q := fmt.Sprintf(`FOR u IN col FILTER u.name == '%s' RETURN u`, name)
-	cursor, err := db.col.Database().Query(ctx, q, nil)
-	if err != nil {
-		return nil, nil, err
+	exists := db.CheckIfExists(User{Name: name})
+	if !exists {
+		return nil, nil, fmt.Errorf("user does not exist")
 	}
+
+	// get the user
+	query := fmt.Sprintf(
+		`FOR u IN %s FILTER u.name == '%s' RETURN u`,
+		db.col.Name(),
+		name,
+	)
+	cursor, err := db.col.Database().Query(
+		ctx,
+		query,
+		nil,
+	)
 	var user User
 	meta, err := cursor.ReadDocument(ctx, &user)
 	if err != nil {
 		return nil, nil, err
 	}
-	fmt.Printf("read res: %+v\n", user)
+	db.logger.Infof("read res: %+v\n", user)
 	db.UpdateMeta(meta)
 	return &user, &meta, err
 }
@@ -196,9 +238,9 @@ func (db *DB) Update(user User) *driver.DocumentMeta {
 	}
 	*meta, err = db.col.UpdateDocument(ctx, meta.Key, user)
 	if err != nil {
-		log.Fatal(err)
+		db.logger.Fatalf(err.Error())
 	}
-	fmt.Printf("update res: %+v\n", meta)
+	db.logger.Infof("update res: %+v\n", meta)
 	db.UpdateMeta(*meta)
 	return meta
 }
@@ -212,9 +254,9 @@ func (db *DB) Delete(name string) *driver.DocumentMeta {
 	}
 	*meta, err = db.col.RemoveDocument(ctx, meta.Key)
 	if err != nil {
-		log.Fatal(err)
+		db.logger.Fatalf(err.Error())
 	}
-	fmt.Printf("delete res: %+v\n", meta)
+	db.logger.Infof("delete res: %+v\n", meta)
 	db.UpdateMeta(*meta)
 	return meta
 }

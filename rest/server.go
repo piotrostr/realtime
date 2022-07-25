@@ -9,7 +9,9 @@ import (
 func GetRouter() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
+
 	db := database.DB{}
+	db.Init()
 
 	// returns User obj
 	router.POST("/create", func(c *gin.Context) {
