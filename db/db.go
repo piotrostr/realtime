@@ -104,7 +104,7 @@ func (db *DB) UpdateMeta(meta driver.DocumentMeta) {
 	db.meta = meta
 }
 
-func (db *DB) Create(user User) {
+func (db *DB) Create(user User) *User {
 	// check if record exists
 	query := fmt.Sprintf(
 		`FOR u IN col FILTER u.name == '%s' RETURN u`,
@@ -132,10 +132,12 @@ func (db *DB) Create(user User) {
 		fmt.Printf("create res: %+v\n", meta)
 		db.UpdateMeta(meta)
 	}
+
+	return db.ReadOne(user.Name)
 }
 
 // read record
-func (db *DB) ReadAll() {
+func (db *DB) ReadAll() []*User {
 	cursor, err := db.col.Database().Query(
 		ctx,
 		`FOR u IN col FILTER u.name == 'Piotr' RETURN u`,
@@ -144,6 +146,7 @@ func (db *DB) ReadAll() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var users []*User
 	for cursor.HasMore() {
 		var user User
 		meta, err := cursor.ReadDocument(ctx, &user)
@@ -151,16 +154,15 @@ func (db *DB) ReadAll() {
 			log.Fatal(err)
 		}
 		fmt.Printf("read res: %+v\n", user)
+		users = append(users, &user)
 		db.UpdateMeta(meta)
 	}
+	return users
 }
 
-func (db *DB) ReadOne() {
-	cursor, err := db.col.Database().Query(
-		ctx,
-		`FOR u IN col FILTER u.name == 'Piotr' RETURN u`,
-		nil,
-	)
+func (db *DB) ReadOne(name string) *User {
+	q := fmt.Sprintf(`FOR u IN col FILTER u.name == '%s' RETURN u`, name)
+	cursor, err := db.col.Database().Query(ctx, q, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -171,10 +173,11 @@ func (db *DB) ReadOne() {
 	}
 	fmt.Printf("read res: %+v\n", user)
 	db.UpdateMeta(meta)
+	return &user
 }
 
 // update record
-func (db *DB) Update() {
+func (db *DB) Update() driver.DocumentMeta {
 	patch := map[string]int{"Age": 21}
 	meta, err := db.col.UpdateDocument(ctx, db.meta.Key, patch)
 	if err != nil {
@@ -182,16 +185,18 @@ func (db *DB) Update() {
 	}
 	fmt.Printf("update res: %+v\n", meta)
 	db.UpdateMeta(meta)
+	return meta
 }
 
 // delete record
-func (db *DB) Delete() {
+func (db *DB) Delete() driver.DocumentMeta {
 	meta, err := db.col.RemoveDocument(ctx, db.meta.Key)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("delete res: %+v\n", meta)
 	db.UpdateMeta(meta)
+	return meta
 }
 
 func (db *DB) DeleteDB() {
